@@ -1,6 +1,5 @@
 Here’s a **chaotically comedic README** (100% not written by AI) you can use for your GitHub repo, tailored to your app and its quirks:
 
-```markdown
 # 🪓 Mineplack ToDo
 
 **The one and only terminal todo app you never knew you needed.**  
