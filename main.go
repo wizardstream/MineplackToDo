@@ -24,6 +24,9 @@ type Task struct {
 // Global slice to hold all tasks in memory
 var tasks []Task
 
+// Set file to load
+var currentFilePath string = "tasks.nasin"
+
 // =======================
 // Utility Functions
 // =======================
@@ -34,10 +37,8 @@ func clearScreen() {
 
 	switch runtime.GOOS {
 	case "windows":
-		// Windows clear screen command
 		cmd = exec.Command("cmd", "/c", "cls")
 	default:
-		// Unix-like clear screen command (Linux, macOS, etc)
 		cmd = exec.Command("clear")
 	}
 
@@ -54,7 +55,7 @@ func clearScreen() {
 // creates it (and any parents) if missing
 func ensureDir() error {
 	dir := filepath.Dir(getTaskFilePath())
-	return os.MkdirAll(dir, 0755) // rwxr-xr-x permissions
+	return os.MkdirAll(dir, 0755)
 }
 
 // getTaskFilePath returns the full path to the tasks file,
@@ -62,11 +63,9 @@ func ensureDir() error {
 func getTaskFilePath() string {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		// fallback: use current directory if home dir can't be found
-		return "tasks.nasin"
+		return currentFilePath // fallback to current dir
 	}
-	// Construct path: ~/mineplacktodo/tasks.nasin or equivalent on Windows
-	return filepath.Join(homeDir, "mineplacktodo", "tasks.nasin")
+	return filepath.Join(homeDir, "mineplacktodo", currentFilePath)
 }
 
 // =======================
@@ -75,7 +74,6 @@ func getTaskFilePath() string {
 
 // saveTasksCustom writes the tasks slice to the file in the custom format
 func saveTasksCustom(tasks []Task) error {
-	// Make sure directory exists before saving
 	if err := ensureDir(); err != nil {
 		return err
 	}
@@ -86,8 +84,6 @@ func saveTasksCustom(tasks []Task) error {
 	}
 	defer file.Close()
 
-	// Write each task line by line in the format:
-	// T1 : "task name" : STRING : DONE:true/false
 	for i, t := range tasks {
 		doneStr := "false"
 		if t.Done {
@@ -107,8 +103,7 @@ func loadTasksCustom() ([]Task, error) {
 	file, err := os.Open(getTaskFilePath())
 	if err != nil {
 		if os.IsNotExist(err) {
-			// No saved tasks yet, return empty slice
-			return []Task{}, nil
+			return []Task{}, nil // file doesn't exist yet
 		}
 		return nil, err
 	}
@@ -119,23 +114,13 @@ func loadTasksCustom() ([]Task, error) {
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		// Split the line by " : " delimiter to extract fields
 		parts := strings.Split(line, " : ")
 		if len(parts) < 4 {
-			// skip malformed lines that don't have all fields
-			continue
+			continue // skip malformed lines
 		}
 
-		// parts breakdown:
-		// parts[0] = task index like T1
-		// parts[1] = task name in quotes
-		// parts[2] = STRING (type, unused)
-		// parts[3] = DONE:true or DONE:false
-
-		// Remove surrounding quotes from the task name
 		name := strings.Trim(parts[1], "\"")
 
-		// Parse done status
 		done := false
 		if strings.HasPrefix(parts[3], "DONE:") {
 			doneStr := strings.TrimPrefix(parts[3], "DONE:")
@@ -152,15 +137,20 @@ func loadTasksCustom() ([]Task, error) {
 	return loadedTasks, nil
 }
 
+// clearAllTasks clears the in-memory tasks slice and saves an empty list to file
+func clearAllTasks() error {
+	tasks = []Task{}
+	return saveTasksCustom(tasks)
+}
+
 // =======================
 // Main Application Loop
 // =======================
 
 func main() {
-	// Clear screen and print header on start
 	clearScreen()
 
-	// Load previously saved tasks from file
+	// Load tasks from file on startup
 	var err error
 	tasks, err = loadTasksCustom()
 	if err != nil {
@@ -170,50 +160,43 @@ func main() {
 
 	reader := bufio.NewReader(os.Stdin)
 
-	// Main REPL loop: prompt user, read input, parse commands
 	for {
 		fmt.Print("> ")
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(input)
 
-		// Skip empty input
 		if input == "" {
 			continue
 		}
 
-		// Split input into command and arguments
 		tokens := strings.Fields(input)
 		cmd := tokens[0]
 		args := tokens[1:]
 
 		switch cmd {
 		case "help":
-			// Display list of available commands
 			fmt.Println(`
 Available commands:
   add <task>         - Add a new task
-  clear              - Clears Screen
+  list               - List all tasks
   done <number>      - Mark a task as completed
   delete <number>    - Delete a task
+  delAll             - Delete ALL tasks in the current file
+  file <file>        - Change to a different task file (loads its tasks)
+  clear              - Clear the terminal screen
   help               - Show this help message
-  list               - List all tasks
-
   exit               - Exit the program`)
 
 		case "add":
-			// Join all arguments to form the task name
 			taskName := strings.Join(args, " ")
-			// Append new task to list
 			tasks = append(tasks, Task{Name: taskName})
 			fmt.Println("Added:", taskName)
 
-			// Save updated tasks to file
 			if err := saveTasksCustom(tasks); err != nil {
 				fmt.Println("Error saving tasks:", err)
 			}
 
 		case "list":
-			// Show all tasks with completion status
 			if len(tasks) == 0 {
 				fmt.Println("No tasks.")
 				continue
@@ -227,7 +210,6 @@ Available commands:
 			}
 
 		case "done":
-			// Mark specified task as done
 			if len(args) < 1 {
 				fmt.Println("Usage: done <number>")
 				continue
@@ -240,13 +222,11 @@ Available commands:
 			tasks[i-1].Done = true
 			fmt.Println("Marked done:", tasks[i-1].Name)
 
-			// Save changes
 			if err := saveTasksCustom(tasks); err != nil {
 				fmt.Println("Error saving tasks:", err)
 			}
 
 		case "delete":
-			// Delete specified task
 			if len(args) < 1 {
 				fmt.Println("Usage: delete <number>")
 				continue
@@ -260,22 +240,40 @@ Available commands:
 			tasks = append(tasks[:i-1], tasks[i:]...)
 			fmt.Println("Deleted:", deleted)
 
-			// Save changes
 			if err := saveTasksCustom(tasks); err != nil {
 				fmt.Println("Error saving tasks:", err)
 			}
 
+		case "delAll":
+			if err := clearAllTasks(); err != nil {
+				fmt.Println("Error clearing tasks:", err)
+			} else {
+				fmt.Println("All tasks deleted from current file.")
+			}
+
+		case "file":
+			if len(args) < 1 {
+				fmt.Println("Usage: file <filename>")
+				continue
+			}
+			newFile := args[0]
+			currentFilePath = newFile
+
+			tasks, err = loadTasksCustom()
+			if err != nil {
+				fmt.Println("Error loading tasks from new file:", err)
+				tasks = []Task{}
+			}
+			fmt.Println("Switched to file:", newFile, "with", len(tasks), "tasks loaded.")
+
 		case "clear":
-			// Clear terminal screen and print header again
 			clearScreen()
 
 		case "exit":
-			// Exit the program gracefully
 			fmt.Println("Goodbye!")
 			return
 
 		default:
-			// Handle unknown commands
 			fmt.Println("Unknown command:", cmd)
 		}
 	}
