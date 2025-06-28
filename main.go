@@ -47,6 +47,7 @@ func clearScreen() {
 	// Print header after clearing
 	fmt.Println("==========================")
 	fmt.Println("======Mineplack ToDo======")
+	fmt.Println("==========================")
 }
 
 // ensureDir makes sure the directory for the tasks file exists,
