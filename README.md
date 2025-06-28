@@ -1,4 +1,4 @@
-Here’s a **chaotically comedic README** (100% not written by AI) you can use for your GitHub repo, tailored to your app and its quirks:
+Here’s a **chaotically comedic README** (100% not written by AI (Actually after reading it, Yes, It was AI, I don't want credit for this... "art")) you can use for your GitHub repo, tailored to your app and its quirks:
 
 # 🪓 Mineplack ToDo
 
